@@ -12,7 +12,10 @@ pipeline {
                 
                 sh '''
                     echo "Installing flake8..."
-                    pip install flake8 --break-system-packages
+                    pip install flake8 --break-system-packages --user
+                    
+                    # Add Jenkins user's local bin to PATH
+                    export PATH=$PATH:/var/lib/jenkins/.local/bin
                     
                     echo "Running flake8 on app.py..."
                     cd webapp
