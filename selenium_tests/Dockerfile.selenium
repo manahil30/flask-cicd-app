@@ -1,0 +1,24 @@
+FROM python:3.10-slim
+
+WORKDIR /tests
+
+# Install Chromium and ChromeDriver for headless testing
+RUN apt-get update && apt-get install -y \
+    chromium \
+    chromium-driver \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Environment variables for Selenium
+ENV CHROME_BIN=/usr/bin/chromium \
+    CHROMEDRIVER_PATH=/usr/bin/chromedriver \
+    PYTHONUNBUFFERED=1
+
+# Copy test scripts
+COPY . .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir selenium pytest requests
+
+# Command to run tests
+CMD ["python", "-m", "unittest", "discover", "-s", ".", "-p", "test_*.py"]

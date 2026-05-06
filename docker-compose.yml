@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # Service 1: PostgreSQL Database
+  db:
+    image: postgres:15-alpine           # Official PostgreSQL image
+    container_name: postgres_db         # Name of the container
+    restart: unless-stopped             # Auto-restart if crashes
+    environment:
+      POSTGRES_USER: postgres           # Database username
+      POSTGRES_PASSWORD: postgres       # Database password
+      POSTGRES_DB: appdb                # Database name
+    ports:
+      - "5432:5432"                     # Map host port 5432 to container port 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Persist data
+      - ./webapp/init.sql:/docker-entrypoint-initdb.d/init.sql  # Initialize schema
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  # Service 2: Flask Web Application
+  webapp:
+    build: ./webapp                     # Build from Dockerfile in webapp folder
+    container_name: flask_webapp
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy      # Wait for database to be healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/appdb
+      SECRET_KEY: dev-secret-key
+    ports:
+      - "5000:5000"                     # Access app at http://localhost:5000
+    volumes:
+      - ./webapp:/app                   # Mount code for development (hot reload)
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app_network
+
+  # Service 3: Selenium Tests
+  selenium_tests:
+    build:
+      context: ./selenium_tests
+      dockerfile: Dockerfile.selenium
+    container_name: selenium_tests
+    depends_on:
+      webapp:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./selenium_tests:/tests
+    networks:
+      - app_network
+    command: ["python", "-m", "unittest", "discover", "-s", ".", "-p", "test_*.py"]
+
+# Networks
+networks:
+  app_network:
+    driver: bridge
+
+# Volumes (persistent storage)
+volumes:
+  postgres_data:
